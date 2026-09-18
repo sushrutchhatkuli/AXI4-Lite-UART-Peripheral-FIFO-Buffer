@@ -36,38 +36,50 @@ Repository: [https://github.com/sushrutchhatkuli/AXI4-Lite-UART-Peripheral-FIFO-
 
 ## Architecture Overview
 
-```
-                                  AXI4-Lite UART Core
-       +-------------------------------------------------------------------------+
-       |                                                                         |
-       |   AXI4-Lite Slave Interface                                             |
-AW --->|   - Decoupled AW / W Handshaking                                        |
- W --->|   - 32-bit Register Decode & Byte Slicing (WSTRB)                       |
- B <---|   - Response Generation (OKAY / SLVERR)                                 |
-AR --->|                                                                         |
- R <---|                                                                         |
-       +-------------------------------------------------------------------------+
-              |                      |                      |             |
-       (Write 0x00)            (Read 0x00)             (Reg Access)    (IRQ Regs)
-              v                      |                      v             v
-       +-------------+        +-------------+        +------------+ +------------+
-       |   TX FIFO   |        |   RX FIFO   |        |  Control & | |  Interrupt |
-       |  16-Element |        |  16-Element |        |  Baud Regs | | Controller |
-       |  Circular   |        |  Circular   |        +------------+ +------------+
-       +-------------+        +-------------+              |              |
-              |                      ^                     |              v
-         (tx_pop)                (rx_push)                 |          uart_irq
-              v                      |                     v
-       +-------------+        +-------------+        +------------+
-       |   UART TX   |        |   UART RX   |<-------|  Baud Rate |
-       | 8-N-1 Serial|        | Center-Smpl | 16x    |  Generator |
-       +-------------+        +-------------+ Ticks  +------------+
-              |                      ^
-              v                      |
-          uart_txd         [ 2-FF CDC Synchronizer ]
-                                     ^
-                                     |
-                                 uart_rxd
+```mermaid
+graph TD
+    AXI_BUS["AXI4-Lite 32-bit Bus<br/>(AW, W, B, AR, R Channels)"]
+    AXI_SLV["AXI4-Lite Slave Controller<br/>(Decoupled Handshake & Register Slicing)"]
+    
+    REG_FILE["Configuration & Status Registers<br/>(BAUD_DIV, CTRL, STAT, FIFO_CNT)"]
+    INTR_CTRL["Interrupt Controller<br/>(W1C Flags & Level Interrupt)"]
+    
+    TX_FIFO["TX FIFO Buffer<br/>(16-Element Circular RAM)"]
+    RX_FIFO["RX FIFO Buffer<br/>(16-Element Circular RAM)"]
+    
+    BAUD_GEN["16X Baud Rate Generator<br/>(Clock Pulse Divider)"]
+    
+    UART_TX["UART TX Engine<br/>(8-N-1 Serializer)"]
+    UART_RX["UART RX Engine<br/>(Center Sampler @ Tick 7)"]
+    CDC_SYNC["2-Stage FF Synchronizer<br/>(Metastability Filter)"]
+
+    PIN_TXD["Pin: uart_txd"]
+    PIN_RXD["Pin: uart_rxd"]
+    PIN_IRQ["Pin: uart_irq"]
+
+    AXI_BUS <==> AXI_SLV
+    
+    AXI_SLV -- "Write Data (0x00)" --> TX_FIFO
+    RX_FIFO -- "Read Data (0x00)" --> AXI_SLV
+    
+    AXI_SLV <--> REG_FILE
+    AXI_SLV --> INTR_CTRL
+    
+    REG_FILE -- "baud_div_val" --> BAUD_GEN
+    BAUD_GEN -- "baud_16x_tick" --> UART_TX
+    BAUD_GEN -- "baud_16x_tick" --> UART_RX
+    
+    TX_FIFO -- "tx_pop / tx_data" --> UART_TX
+    UART_TX --> PIN_TXD
+    
+    PIN_RXD --> CDC_SYNC
+    CDC_SYNC -- "sync_rx" --> UART_RX
+    UART_RX -- "rx_push / rx_data" --> RX_FIFO
+    
+    TX_FIFO -- "tx_empty event" --> INTR_CTRL
+    RX_FIFO -- "rx_ready event" --> INTR_CTRL
+    UART_RX -- "framing_err event" --> INTR_CTRL
+    INTR_CTRL --> PIN_IRQ
 ```
 
 ### Module Hierarchy

@@ -191,16 +191,23 @@ The receiver engine samples incoming serial data using an oversampling counter r
 3. **Framing Error Detection**: At Tick 7 of the stop bit window, the receiver verifies logic 1. If logic 0 is sampled, `FRAMING_ERR` is raised, and the corrupted byte is discarded.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> RX_IDLE
-    RX_IDLE --> RX_START : Falling Edge Detected
-    RX_START --> RX_IDLE : Tick 7 && RX == 1 (Glitch Discarded)
-    RX_START --> RX_DATA : Tick 15 && RX == 0 (Start Confirmed)
-    RX_DATA --> RX_DATA : baud_16x_tick (Sample bit @ Tick 7)
-    RX_DATA --> RX_STOP : bit_cnt == 7 && Tick 15
-    RX_STOP --> RX_IDLE : Tick 7 && RX == 1 (Valid Frame: Push to FIFO)
-    RX_STOP --> RX_ERR_WAIT : Tick 7 && RX == 0 (Framing Error)
-    RX_ERR_WAIT --> RX_IDLE : RX == 1 (Line returns high; Safe re-arm)
+graph TD
+    IDLE["RX_IDLE<br/>(Line High / Monitor Falling Edge)"]
+    START["RX_START<br/>(Count 16x Ticks / Glitch Check @ Tick 7)"]
+    DATA["RX_DATA<br/>(8-Bit Deserialization / Center Sample @ Tick 7)"]
+    STOP["RX_STOP<br/>(Stop Bit Verification @ Tick 7)"]
+    ERR_WAIT["RX_ERR_WAIT<br/>(Error Recovery / Wait for Line High)"]
+    FIFO["RX FIFO Buffer<br/>(16-Element Circular RAM)"]
+
+    IDLE -- "Falling Edge Detected" --> START
+    START -- "Tick 7: RX == 1 (Noise Glitch Rejected)" --> IDLE
+    START -- "Tick 15: RX == 0 (Valid Start Confirmed)" --> DATA
+    DATA -- "baud_16x_tick (Sample Bits 0 to 7)" --> DATA
+    DATA -- "8 Bits Complete (bit_cnt == 7)" --> STOP
+    STOP -- "Stop Bit == 1 (Valid Frame: Push Data)" --> FIFO
+    FIFO --> IDLE
+    STOP -- "Stop Bit == 0 (Framing Error Detected)" --> ERR_WAIT
+    ERR_WAIT -- "Line Returns High (Safe Re-arm)" --> IDLE
 ```
 
 ---

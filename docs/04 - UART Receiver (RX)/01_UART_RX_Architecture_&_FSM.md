@@ -40,21 +40,23 @@ graph LR
 ## 2. Receiver Finite State Machine (FSM)
 
 ```mermaid
-stateDiagram-v2
-    [*] --> RX_IDLE
-    
-    RX_IDLE --> RX_START : Falling edge detected on sync_rx <br/> [Reset tick_cnt = 0]
-    
-    RX_START --> RX_IDLE : (tick_cnt == 7 && sync_rx == 1) <br/> [Glitch rejected!]
-    RX_START --> RX_DATA : (tick_cnt == 15 && sync_rx == 0) <br/> [Valid start confirmed]
-    
-    RX_DATA --> RX_DATA : (baud_16x_tick) <br/> [Sample bit @ tick 7]
-    RX_DATA --> RX_STOP : (bit_cnt == 7 && tick_cnt == 15)
-    
-    RX_STOP --> RX_IDLE : (tick_cnt == 7 && sync_rx == 1) <br/> [Valid Stop! Push to FIFO]
-    RX_STOP --> RX_ERR_WAIT : (tick_cnt == 7 && sync_rx == 0) <br/> [Framing Error! Assert Flag]
-    
-    RX_ERR_WAIT --> RX_IDLE : sync_rx == 1 <br/> [Line restored to Mark, Safe to re-arm]
+graph TD
+    IDLE["RX_IDLE<br/>(Monitor Falling Edge)"]
+    START["RX_START<br/>(Glitch Check @ Tick 7)"]
+    DATA["RX_DATA<br/>(Center Sample @ Tick 7)"]
+    STOP["RX_STOP<br/>(Stop Bit Check @ Tick 7)"]
+    ERR_WAIT["RX_ERR_WAIT<br/>(Wait for Line High)"]
+    FIFO["RX FIFO Buffer<br/>(Push Valid Byte)"]
+
+    IDLE -- "Falling Edge Detected" --> START
+    START -- "Tick 7: sync_rx == 1 (Glitch Discarded)" --> IDLE
+    START -- "Tick 15: sync_rx == 0 (Valid Start Confirmed)" --> DATA
+    DATA -- "baud_16x_tick (Sample Bits 0..7)" --> DATA
+    DATA -- "bit_cnt == 7 && tick_cnt == 15" --> STOP
+    STOP -- "Tick 7: sync_rx == 1 (Valid Stop)" --> FIFO
+    FIFO --> IDLE
+    STOP -- "Tick 7: sync_rx == 0 (Framing Error)" --> ERR_WAIT
+    ERR_WAIT -- "sync_rx == 1 (Line Restored to Mark)" --> IDLE
 ```
 
 ### State Specifications

@@ -28,21 +28,28 @@ To achieve full compliance with AMBA specifications and maximize interconnect ti
   - `w_captured`: Set HIGH when write data handshake completes; cleared when write executes.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> IDLE
-    
-    state "WRITE TRANSACTIONS" as WR {
-        IDLE --> WAIT_WRITE_PAIR : AWVALID or WVALID asserted
-        WAIT_WRITE_PAIR --> EXECUTE_WRITE : (aw_captured || AW_HS) && (w_captured || W_HS)
-        EXECUTE_WRITE --> WRITE_RESP : Internal Reg Update Complete
-        WRITE_RESP --> IDLE : BVALID && BREADY
-    }
+graph TD
+    subgraph WR_FLOW ["Write Transaction Flow"]
+        W_IDLE["WR_IDLE<br/>(AWREADY=1, WREADY=1)"]
+        W_PAIR["LATCH_PHASE<br/>(Capture AWADDR / WDATA)"]
+        W_COMMIT["COMMIT_WRITE<br/>(Update Register File / TX FIFO)"]
+        W_RESP["WRITE_RESPONSE<br/>(Assert BVALID & BRESP)"]
 
-    state "READ TRANSACTIONS" as RD {
-        IDLE --> CAPTURE_READ_ADDR : ARVALID && ARREADY
-        CAPTURE_READ_ADDR --> READ_DATA_VALID : Mapped Data Latched
-        READ_DATA_VALID --> IDLE : RVALID && RREADY
-    }
+        W_IDLE -- "AWVALID or WVALID Asserted" --> W_PAIR
+        W_PAIR -- "Address & Data Both Captured" --> W_COMMIT
+        W_COMMIT --> W_RESP
+        W_RESP -- "BVALID && BREADY Handshake" --> W_IDLE
+    end
+
+    subgraph RD_FLOW ["Read Transaction Flow"]
+        R_IDLE["RD_IDLE<br/>(ARREADY=1)"]
+        R_ADDR["CAPTURE_READ_ADDR<br/>(Latch ARADDR)"]
+        R_DATA["READ_DATA_VALID<br/>(Assert RVALID & Drive RDATA/RRESP)"]
+
+        R_IDLE -- "ARVALID && ARREADY Handshake" --> R_ADDR
+        R_ADDR -- "Register Decode Complete" --> R_DATA
+        R_DATA -- "RVALID && RREADY Handshake" --> R_IDLE
+    end
 ```
 
 ---

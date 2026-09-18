@@ -40,18 +40,18 @@ Each frame transmitted on the `TX` pin consists of 10 discrete bit periods:
 The TX engine operates on a clean 4-state Moore/Mealy hybrid FSM clocked by the system clock and gated by `baud_16x_tick`.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> TX_IDLE
-    
-    TX_IDLE --> TX_START : (!fifo_empty && tx_en) <br/> [Pop FIFO, Latch Data]
-    
-    TX_START --> TX_DATA : (tick_cnt == 15 && baud_16x_tick) <br/> [Drive bit 0]
-    
-    TX_DATA --> TX_DATA : (baud_16x_tick) <br/> [Hold 16 ticks per bit]
-    TX_DATA --> TX_STOP : (bit_cnt == 7 && tick_cnt == 15 && baud_16x_tick)
-    
-    TX_STOP --> TX_IDLE : (tick_cnt == 15 && baud_16x_tick && fifo_empty)
-    TX_STOP --> TX_START : (tick_cnt == 15 && baud_16x_tick && !fifo_empty && tx_en) <br/> [Back-to-back burst]
+graph TD
+    IDLE["TX_IDLE<br/>(Line Mark / Idle High)"]
+    START["TX_START<br/>(Drive Start Bit 0 for 16 Ticks)"]
+    DATA["TX_DATA<br/>(Shift Out Bits D0..D7 LSB-First)"]
+    STOP["TX_STOP<br/>(Drive Stop Bit 1 for 16 Ticks)"]
+
+    IDLE -- "!fifo_empty && tx_en (Pop FIFO, Latch Data)" --> START
+    START -- "tick_cnt == 15 (Start Complete)" --> DATA
+    DATA -- "baud_16x_tick (Hold 16 Ticks per Bit)" --> DATA
+    DATA -- "bit_cnt == 7 && tick_cnt == 15" --> STOP
+    STOP -- "tick_cnt == 15 && fifo_empty" --> IDLE
+    STOP -- "tick_cnt == 15 && !fifo_empty && tx_en (Zero-Bubble Burst)" --> START
 ```
 
 ### State Explanations

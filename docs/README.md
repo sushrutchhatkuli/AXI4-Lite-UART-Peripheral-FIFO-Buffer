@@ -350,6 +350,7 @@ graph TD
 │   ├── axi_master_bfm.sv               Bus Functional Model with randomized latencies
 │   ├── tb_uart_axi_top.sv              Self-checking testbench
 │   ├── run_sim.do                      ModelSim batch compilation and execution script
+│   ├── run_xsim.bat                    Vivado xsim compile / elaborate / run script
 │   └── wave.do                         ModelSim waveform setup script
 └── docs/                               Obsidian Knowledge Base (Detailed Specs)
     ├── 00 - Index & Overview/          MOC and resume specification traceability
@@ -368,8 +369,16 @@ graph TD
 ## Simulation & Build Instructions
 
 ### Prerequisites
-- Mentor Graphics ModelSim / QuestaSim (or compatible SystemVerilog simulator)
+- A SystemVerilog simulator: AMD/Xilinx Vivado (`xsim`) or Mentor ModelSim / QuestaSim
 - Git
+
+### Running Simulation (Vivado xsim)
+With Vivado's `bin` directory on `PATH`, from the repository root:
+```bat
+tb\run_xsim.bat
+```
+The script compiles the RTL and testbench with `xvlog`, elaborates with `xelab`, and runs
+the suite to completion with `xsim -R`.
 
 ### Running Simulation (ModelSim GUI)
 1. Launch ModelSim.
@@ -387,7 +396,7 @@ graph TD
 vsim -c -do "do run_sim.do; quit -f"
 ```
 
-The testbench runs through all 13 test scenarios, reports per-test status to the transcript, checks scoreboards, and prints a final pass/fail summary.
+The testbench runs nine test cases (14 self-checking assertions in total), reports per-test status with timestamps to the transcript, checks scoreboards, and prints a final pass/fail summary. A global watchdog fails the run rather than hanging if a handshake ever stalls.
 
 ---
 

@@ -3,12 +3,25 @@
 **/.obsidian/workspace-mobile.json
 **/.obsidian/cache/
 
-# Simulation artifacts
+# Simulation artifacts (ModelSim / QuestaSim)
 work/
 *.wlf
 transcript
 *.vstf
 *.log
+
+# Simulation artifacts (Vivado xsim)
+xsim.dir/
+.Xil/
+*.pb
+*.jou
+*.wdb
+xvlog.log
+xelab.log
+xsim.log
+webtalk*.
+dfx_runtime.txt
+xsim_probe.tcl
 
 # Python cache
 __pycache__/

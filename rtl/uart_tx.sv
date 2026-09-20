@@ -110,6 +110,7 @@ module uart_tx (
                             if (!tx_empty && tx_en) begin
                                 shift_reg <= tx_data;
                                 tx_pop    <= 1'b1;
+                                bit_cnt   <= '0; // ST_IDLE is bypassed, so re-arm here
                                 state_reg <= ST_START;
                             end else begin
                                 state_reg <= ST_IDLE;

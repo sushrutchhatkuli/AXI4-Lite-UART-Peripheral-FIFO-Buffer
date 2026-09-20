@@ -84,4 +84,33 @@ always_ff @(posedge clk or negedge rst_n) begin
 end
 ```
 
+### Sticky Error Flags in `UART_STATUS`
+The receiver reports `framing_err` and `overrun_err` as **single-cycle strobes**, which is
+what the interrupt capture logic wants but is useless to software polling `UART_STATUS`: a
+CPU read is many cycles wide and would almost never land on the one cycle the pulse is high.
+
+`UART_STATUS[5]` (`FRAMING_ERR`) and `UART_STATUS[6]` (`OVERRUN_ERR`) are therefore driven by
+dedicated sticky registers in `uart_axi_top`, latched on the strobe and released only when
+software clears the matching `UART_INTR_STAT` bit. The slave exports a `intr_clr[3:0]` W1C
+strobe for exactly this purpose, so the status mirror and the interrupt flag always clear
+together and cannot drift apart:
+
+```systemverilog
+always_ff @(posedge s_axi_aclk or negedge s_axi_aresetn) begin
+    if (!s_axi_aresetn) begin
+        sticky_framing_err <= 1'b0;
+        sticky_overrun_err <= 1'b0;
+    end else begin
+        if (framing_err)                         sticky_framing_err <= 1'b1;
+        else if (intr_clr[INTR_FRAMING_ERR_BIT]) sticky_framing_err <= 1'b0;
+
+        if (overrun_err)                         sticky_overrun_err <= 1'b1;
+        else if (intr_clr[INTR_OVERRUN_ERR_BIT]) sticky_overrun_err <= 1'b0;
+    end
+end
+```
+
+As with the interrupt register, the hardware set branch is evaluated first so an error
+arriving on the same cycle as the clearing write survives.
+
 [[01_Verification_Plan_&_Coverage_Goals|Next: Verification Plan & Coverage Goals ->]]

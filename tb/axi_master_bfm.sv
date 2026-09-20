@@ -23,6 +23,12 @@ class axi_master_bfm;
         input int          w_delay = 0,
         output logic [1:0] bresp
     );
+        // Synchronise to a clock edge before driving. Without this, a caller that
+        // happens to invoke the task exactly on a posedge would schedule the
+        // assertion and de-assertion of *VALID into the same NBA region, silently
+        // cancelling the pulse before the slave ever samples it.
+        @(posedge vif.aclk);
+
         fork
             // AW Channel Thread
             begin
@@ -59,6 +65,7 @@ class axi_master_bfm;
         output logic [1:0]  rresp,
         input  int          ar_delay = 0
     );
+        @(posedge vif.aclk);
         repeat(ar_delay) @(posedge vif.aclk);
         vif.araddr  <= addr;
         vif.arprot  <= 3'b000;

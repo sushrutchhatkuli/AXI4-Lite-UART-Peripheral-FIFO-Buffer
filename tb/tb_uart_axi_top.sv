@@ -12,8 +12,9 @@ import uart_pkg::*;
 
 module tb_uart_axi_top;
 
-    localparam time CLK_PERIOD = 10ns; // 100 MHz clock
-    localparam int  FAST_DIVISOR = 4;  // Fast baud divisor for rapid simulation
+    localparam time CLK_PERIOD  = 10ns; // 100 MHz clock
+    localparam int  FAST_DIVISOR = 4;   // Fast baud divisor for rapid simulation
+    localparam time SIM_TIMEOUT  = 20ms; // Watchdog limit for the whole suite
 
     logic clk;
     logic rst_n;
@@ -66,6 +67,15 @@ module tb_uart_axi_top;
         forever #(CLK_PERIOD / 2) clk = ~clk;
     end
 
+    // Global watchdog: a stalled handshake must fail the run, never hang it
+    initial begin
+        #(SIM_TIMEOUT);
+        $display("=========================================================");
+        $display("   WATCHDOG TIMEOUT at %0t - testbench stalled", $time);
+        $display("=========================================================");
+        $fatal(1, "Simulation exceeded %0t without completing", SIM_TIMEOUT);
+    end
+
     // Test Variables & Scoreboard
     axi_master_bfm bfm;
     int test_pass_count = 0;
@@ -75,10 +85,10 @@ module tb_uart_axi_top;
     // Assert Helper Task
     task check(input string test_name, input bit condition);
         if (condition) begin
-            $display("[PASS] %s", test_name);
+            $display("[PASS] @%0t %s", $time, test_name);
             test_pass_count++;
         end else begin
-            $error("[FAIL] %s", test_name);
+            $error("[FAIL] @%0t %s", $time, test_name);
             test_fail_count++;
         end
     endtask
@@ -187,7 +197,7 @@ module tb_uart_axi_top;
         begin
             logic [31:0] rdata, stat;
             logic [1:0]  resp;
-            bit match_ok = 1'b1;
+            automatic bit match_ok = 1'b1;
 
             for (int i = 0; i < 16; i++) begin
                 do begin
@@ -207,26 +217,31 @@ module tb_uart_axi_top;
         begin
             logic [31:0] stat, rx_byte;
             logic [1:0]  resp;
-            int error_count = 0;
+            automatic int error_count = 0;
 
             $display("--- Running Randomized AXI Latency Stress Test (100 Packets) ---");
             for (int p = 0; p < 100; p++) begin
-                byte send_val = $urandom_range(0, 255);
-                int aw_d = $urandom_range(0, 8);
-                int w_d  = $urandom_range(0, 8);
+                automatic byte send_val = $urandom_range(0, 255);
+                automatic int  aw_d     = $urandom_range(0, 8);
+                automatic int  w_d      = $urandom_range(0, 8);
+
+                // The bus is orders of magnitude faster than the serial link, so
+                // throttle on TX_FULL and drain the RX side while waiting. Writing
+                // blind would silently overrun the 16-deep TX FIFO and drop packets.
+                forever begin
+                    bfm.read_reg(32'h04, stat, resp);
+                    if (stat[4]) begin
+                        automatic int ar_d = $urandom_range(0, 5);
+                        bfm.read_reg(32'h00, rx_byte, resp, ar_d);
+                        if (rx_byte[7:0] !== expected_queue.pop_front()) begin
+                            error_count++;
+                        end
+                    end
+                    if (!stat[1]) break; // TX FIFO has room for another byte
+                end
 
                 expected_queue.push_back(send_val);
                 bfm.write_reg(32'h00, send_val, 4'b0001, aw_d, w_d, resp);
-
-                // Read whenever available
-                bfm.read_reg(32'h04, stat, resp);
-                if (stat[4]) begin
-                    int ar_d = $urandom_range(0, 5);
-                    bfm.read_reg(32'h00, rx_byte, resp, ar_d);
-                    if (rx_byte[7:0] !== expected_queue.pop_front()) begin
-                        error_count++;
-                    end
-                end
             end
 
             // Flush remaining
@@ -249,7 +264,7 @@ module tb_uart_axi_top;
         begin
             logic [31:0] stat;
             logic [1:0]  resp;
-            time bit_time = (FAST_DIVISOR + 1) * 16 * CLK_PERIOD;
+            automatic time bit_time = (FAST_DIVISOR + 1) * 16 * CLK_PERIOD;
 
             $display("--- Running Framing Error Injection & Recovery Test ---");
 

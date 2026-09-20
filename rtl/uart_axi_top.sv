@@ -110,13 +110,33 @@ module uart_axi_top #(
     wire hw_framing_err_event = framing_err;
     wire hw_overrun_err_event = overrun_err;
 
+    // Sticky error flags for UART_STATUS[6:5]. The receiver emits single-cycle
+    // pulses, but software polling STATUS must still observe the error, so they
+    // latch until the matching UART_INTR_STAT bit is cleared via W1C.
+    logic [3:0] intr_clr;
+    logic       sticky_framing_err;
+    logic       sticky_overrun_err;
+
+    always_ff @(posedge s_axi_aclk or negedge s_axi_aresetn) begin
+        if (!s_axi_aresetn) begin
+            sticky_framing_err <= 1'b0;
+            sticky_overrun_err <= 1'b0;
+        end else begin
+            if (framing_err)                         sticky_framing_err <= 1'b1;
+            else if (intr_clr[INTR_FRAMING_ERR_BIT]) sticky_framing_err <= 1'b0;
+
+            if (overrun_err)                         sticky_overrun_err <= 1'b1;
+            else if (intr_clr[INTR_OVERRUN_ERR_BIT]) sticky_overrun_err <= 1'b0;
+        end
+    end
+
     // Status Register Aggregation
     assign status_reg = {
         23'h0,
         rx_busy,                // bit 8
         tx_busy,                // bit 7
-        overrun_err,            // bit 6
-        framing_err,            // bit 5
+        sticky_overrun_err,     // bit 6
+        sticky_framing_err,     // bit 5
         !rx_fifo_empty,         // bit 4 (RX_DATA_READY)
         rx_fifo_full,           // bit 3
         rx_fifo_empty,          // bit 2
@@ -175,6 +195,7 @@ module uart_axi_top #(
         .hw_rx_ready_event    (hw_rx_ready_event),
         .hw_framing_err_event (hw_framing_err_event),
         .hw_overrun_err_event (hw_overrun_err_event),
+        .intr_clr             (intr_clr),
         .uart_irq             (uart_irq)
     );
 

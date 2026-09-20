@@ -89,7 +89,14 @@ graph TD
      - **If `sync_rx == 1` (Valid Stop Bit)**:
        - Assert `rx_data_out <= shift_reg`.
        - Assert `rx_push_strobe <= 1'b1` (if RX FIFO is not full).
-       - When tick 15 completes, transition back to `RX_IDLE`.
+       - Transition back to `RX_IDLE` immediately at tick 7, **not** at tick 15. The
+         frame has already been fully validated, and riding out the remaining 8 ticks
+         would consume the entire second half of the stop bit. Because the receiver
+         runs roughly one oversampling tick behind the transmitter (CDC synchroniser
+         latency plus tick-grid quantisation), a zero-bubble back-to-back frame would
+         drive its start bit low *before* `RX_IDLE` was re-entered, and the falling
+         edge would be missed. Re-arming at the stop-bit midpoint leaves ~8 ticks of
+         guard band before the next start edge.
      - **If `sync_rx == 0` (Framing Error)**:
        - Assert `framing_err <= 1'b1`.
        - Drop byte or tag as corrupted.
@@ -229,15 +236,15 @@ module uart_rx (
                                 end else begin
                                     overrun_err <= 1'b1;
                                 end
-                                tick_cnt <= tick_cnt + 1'b1;
+                                // Re-arm at the stop-bit midpoint so a back-to-back
+                                // frame's start edge is still seen from ST_IDLE
+                                tick_cnt  <= '0;
+                                state_reg <= ST_IDLE;
                             end else begin
                                 // Framing Error
                                 framing_err <= 1'b1;
                                 state_reg   <= ST_ERR_WAIT;
                             end
-                        end else if (tick_cnt == 4'd15) begin
-                            tick_cnt  <= '0;
-                            state_reg <= ST_IDLE;
                         end else begin
                             tick_cnt <= tick_cnt + 1'b1;
                         end

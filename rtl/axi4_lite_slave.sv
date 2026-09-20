@@ -62,6 +62,9 @@ module axi4_lite_slave #(
     input  logic                  hw_framing_err_event,
     input  logic                  hw_overrun_err_event,
 
+    // W1C clear strobes, one per UART_INTR_STAT bit, for sticky status flags
+    output logic [3:0]            intr_clr,
+
     // Interrupt Line
     output logic                  uart_irq
 );
@@ -187,24 +190,26 @@ module axi4_lite_slave #(
     end
 
     // Write-1-to-Clear (W1C) Interrupt Status Register
+    assign intr_clr = (write_ready_to_commit &&
+                       (write_addr[7:0] == ADDR_UART_INTR_STAT) &&
+                       write_strb[0]) ? write_data[3:0] : 4'b0000;
+
     always_ff @(posedge s_axi_aclk or negedge s_axi_aresetn) begin
         if (!s_axi_aresetn) begin
             intr_stat_reg <= '0;
         end else begin
-            // Hardware events take priority
+            // Software W1C clear is applied first so that a hardware event landing
+            // on the same cycle overrides it and is never silently lost.
+            for (int b = 0; b < 4; b++) begin
+                if (intr_clr[b]) begin
+                    intr_stat_reg[b] <= 1'b0;
+                end
+            end
+
             if (hw_tx_empty_event)    intr_stat_reg[INTR_TX_EMPTY_BIT]    <= 1'b1;
             if (hw_rx_ready_event)    intr_stat_reg[INTR_RX_READY_BIT]    <= 1'b1;
             if (hw_framing_err_event) intr_stat_reg[INTR_FRAMING_ERR_BIT] <= 1'b1;
             if (hw_overrun_err_event) intr_stat_reg[INTR_OVERRUN_ERR_BIT] <= 1'b1;
-
-            // Software W1C clear
-            if (write_ready_to_commit && (write_addr[7:0] == ADDR_UART_INTR_STAT) && write_strb[0]) begin
-                for (int b = 0; b < 4; b++) begin
-                    if (write_data[b]) begin
-                        intr_stat_reg[b] <= 1'b0;
-                    end
-                end
-            end
         end
     end
 

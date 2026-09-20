@@ -79,7 +79,7 @@ graph TD
 4. **`TX_STOP`**:
    - Output `tx_out = 1'b1` (Drive stop bit).
    - Hold for 16 ticks (`tick_cnt == 15`).
-   - If `!fifo_empty && tx_en` on tick 15: Pop next byte, load shift register, and transition directly to `TX_START` (**Zero inter-byte bubble latency** for maximum transmission throughput).
+   - If `!fifo_empty && tx_en` on tick 15: Pop next byte, load shift register, clear `bit_cnt`, and transition directly to `TX_START` (**Zero inter-byte bubble latency** for maximum transmission throughput). Clearing `bit_cnt` here is mandatory: this path bypasses `TX_IDLE`, which is the only other state that re-arms the counter, so leaving it at 7 would end `TX_DATA` after a single data bit.
    - Otherwise, assert `tx_done_pulse` and transition to `TX_IDLE`.
 
 ---
@@ -183,6 +183,7 @@ module uart_tx (
                             if (!tx_empty && tx_en) begin
                                 shift_reg <= tx_data;
                                 tx_pop    <= 1'b1;
+                                bit_cnt   <= '0; // ST_IDLE is bypassed, re-arm here
                                 state_reg <= ST_START;
                             end else begin
                                 state_reg <= ST_IDLE;

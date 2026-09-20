@@ -144,15 +144,17 @@ module uart_rx (
                                 end else begin
                                     overrun_err <= 1'b1;
                                 end
-                                tick_cnt <= tick_cnt + 1'b1;
+                                // Re-arm at the stop-bit midpoint rather than riding out
+                                // the remaining 8 ticks. On a zero-bubble back-to-back
+                                // burst the next start edge lands at the end of this stop
+                                // bit, and IDLE must already be active to detect it.
+                                tick_cnt  <= '0;
+                                state_reg <= ST_IDLE;
                             end else begin
                                 // Framing Error detected (stop bit == 0)
                                 framing_err <= 1'b1;
                                 state_reg   <= ST_ERR_WAIT;
                             end
-                        end else if (tick_cnt == 4'd15) begin
-                            tick_cnt  <= '0;
-                            state_reg <= ST_IDLE;
                         end else begin
                             tick_cnt <= tick_cnt + 1'b1;
                         end

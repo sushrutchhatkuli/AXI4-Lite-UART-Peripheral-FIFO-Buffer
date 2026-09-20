@@ -172,7 +172,7 @@ module tb_uart_axi_top;
 
         // TEST 6: FIFO Burst Write to Full Capacity (16 Bytes)
         begin
-            logic [31:0] stat, cnt;
+            logic [31:0] stat, cnt, intr;
             logic [1:0]  resp;
 
             // Disable TX temporarily to fill FIFO without transmitting
@@ -188,6 +188,20 @@ module tb_uart_axi_top;
 
             // Overflow attempt: write 17th byte
             bfm.write_reg(32'h00, 32'hFF, 4'b0001, 0, 0, resp);
+
+            bfm.read_reg(32'h04, stat, resp);
+            bfm.read_reg(32'h10, cnt, resp);
+            bfm.read_reg(32'h14, intr, resp);
+            check("TC_06: Overflow write is dropped, FIFO still holds 16 words", cnt[4:0] == 5'd16);
+            check("TC_06: Overflow write asserts sticky OVERRUN_ERR", stat[6] == 1'b1);
+            check("TC_06: Overflow write latches OVERRUN_ERR interrupt", intr[3] == 1'b1);
+
+            // Clear via W1C and confirm the status mirror tracks the interrupt flag
+            bfm.write_reg(32'h14, 32'h0000_0008, 4'b0001, 0, 0, resp);
+            bfm.read_reg(32'h04, stat, resp);
+            bfm.read_reg(32'h14, intr, resp);
+            check("TC_06: W1C clears OVERRUN_ERR status bit", stat[6] == 1'b0);
+            check("TC_06: W1C clears OVERRUN_ERR interrupt flag", intr[3] == 1'b0);
 
             // Re-enable TX to begin drain
             bfm.write_reg(32'h08, 32'h0000_000F, 4'b0001, 0, 0, resp);
@@ -258,6 +272,11 @@ module tb_uart_axi_top;
             end
 
             check("TC_08: Randomized AXI channel latencies completed with zero errors", error_count == 0);
+
+            // Throttling on TX_FULL must mean no byte was ever dropped, so the
+            // overrun flag has to still be clear after 100 packets.
+            bfm.read_reg(32'h04, stat, resp);
+            check("TC_08: No spurious OVERRUN_ERR across 100 throttled packets", stat[6] == 1'b0);
         end
 
         // TEST 9: Framing Error Injection & Safe Recovery

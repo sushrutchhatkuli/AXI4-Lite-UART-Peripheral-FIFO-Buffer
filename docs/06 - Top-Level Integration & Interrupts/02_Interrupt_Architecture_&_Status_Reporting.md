@@ -24,7 +24,7 @@ Our UART peripheral aggregates four hardware interrupt sources:
 | **`TX_EMPTY`** | `Bit 0` | `Bit 0` | TX FIFO transitions from non-empty to empty | Alerts CPU driver to load the next block of bytes |
 | **`RX_READY`** | `Bit 1` | `Bit 1` | RX FIFO transitions from empty to non-empty (`count > 0`)| Alerts CPU driver to read incoming bytes |
 | **`FRAMING_ERR`**| `Bit 2` | `Bit 2` | Stop bit sampled as 0 during reception | Alerts CPU to link noise or baud mismatch |
-| **`OVERRUN_ERR`**| `Bit 3` | `Bit 3` | Received byte dropped due to full RX FIFO | Alerts CPU of packet loss due to software latency |
+| **`OVERRUN_ERR`**| `Bit 3` | `Bit 3` | Byte dropped due to a full FIFO, on either the receive or the transmit path | Alerts CPU of packet loss due to software latency |
 
 ---
 
@@ -112,5 +112,20 @@ end
 
 As with the interrupt register, the hardware set branch is evaluated first so an error
 arriving on the same cycle as the clearing write survives.
+
+### Transmit-Side Overrun
+`OVERRUN_ERR` covers data loss in *both* directions. `fifo_circular` discards a `push` that
+arrives while the buffer is full, so an AXI write to `UART_DATA` against a full TX FIFO is
+dropped exactly the way a received byte is dropped against a full RX FIFO. The top level
+detects it directly from the FIFO handshake rather than needing a new slave port:
+
+```systemverilog
+wire tx_overrun_event     = tx_fifo_push && tx_fifo_full && !tx_fifo_pop;
+wire hw_overrun_err_event = overrun_err || tx_overrun_event;
+```
+
+The `!tx_fifo_pop` term matters: when the transmitter retires an entry on the very same
+cycle the write lands, the FIFO accepts the byte and no data is lost, so flagging an
+overrun there would be a false positive.
 
 [[01_Verification_Plan_&_Coverage_Goals|Next: Verification Plan & Coverage Goals ->]]

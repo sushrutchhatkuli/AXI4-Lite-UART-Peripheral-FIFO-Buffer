@@ -124,7 +124,7 @@ All registers are 32-bit word aligned. Accesses to unmapped address offsets retu
 - `Bit 3`: `RX_FULL` (1 = Receive FIFO contains 16 unread words)
 - `Bit 4`: `RX_DATA_READY` (1 = At least one valid byte waiting in RX FIFO)
 - `Bit 5`: `FRAMING_ERR` (1 = Stop bit sampled as 0; sticky until cleared via `INTR_STAT`)
-- `Bit 6`: `OVERRUN_ERR` (1 = Byte received while RX FIFO was full; sticky)
+- `Bit 6`: `OVERRUN_ERR` (1 = A byte was dropped because its FIFO was full, either received while the RX FIFO was full or written while the TX FIFO was full; sticky until cleared via `INTR_STAT`)
 - `Bit 7`: `TX_BUSY` (1 = Transmitter actively shifting out a frame)
 - `Bit 8`: `RX_BUSY` (1 = Receiver actively deserializing a frame)
 
@@ -292,7 +292,7 @@ External serial signals arrive asynchronously relative to the peripheral system 
 - **`TX_EMPTY`**: Generated when transmit FIFO transitions from non-empty to empty, alerting the processor to stage the next data block.
 - **`RX_READY`**: Generated when receive FIFO contains one or more unread bytes.
 - **`FRAMING_ERR`**: Generated when stop bit is sampled as logic 0.
-- **`OVERRUN_ERR`**: Generated when a received byte is dropped due to a full RX FIFO.
+- **`OVERRUN_ERR`**: Generated whenever a byte is dropped because its FIFO was full, covering both a received byte arriving at a full RX FIFO and an AXI write landing on a full TX FIFO.
 
 ### Write-1-to-Clear (W1C) Implementation
 To eliminate the hardware-software race conditions inherent in legacy Read-to-Clear registers:
@@ -396,7 +396,7 @@ the suite to completion with `xsim -R`.
 vsim -c -do "do run_sim.do; quit -f"
 ```
 
-The testbench runs nine test cases (14 self-checking assertions in total), reports per-test status with timestamps to the transcript, checks scoreboards, and prints a final pass/fail summary. A global watchdog fails the run rather than hanging if a handshake ever stalls.
+The testbench runs nine test cases (20 self-checking assertions in total), reports per-test status with timestamps to the transcript, checks scoreboards, and prints a final pass/fail summary. A global watchdog fails the run rather than hanging if a handshake ever stalls.
 
 ---
 

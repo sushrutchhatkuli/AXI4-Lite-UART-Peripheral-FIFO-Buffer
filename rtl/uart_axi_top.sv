@@ -108,7 +108,12 @@ module uart_axi_top #(
     wire hw_tx_empty_event    = (tx_empty_prev == 1'b0) && (tx_fifo_empty == 1'b1);
     wire hw_rx_ready_event    = (rx_empty_prev == 1'b1) && (rx_fifo_empty == 1'b0);
     wire hw_framing_err_event = framing_err;
-    wire hw_overrun_err_event = overrun_err;
+
+    // An AXI write landing on a full TX FIFO is discarded by fifo_circular, unless a
+    // pop retires an entry on the very same cycle. That is a silent data loss on the
+    // transmit path, so it raises OVERRUN_ERR alongside the receive-side overrun.
+    wire tx_overrun_event     = tx_fifo_push && tx_fifo_full && !tx_fifo_pop;
+    wire hw_overrun_err_event = overrun_err || tx_overrun_event;
 
     // Sticky error flags for UART_STATUS[6:5]. The receiver emits single-cycle
     // pulses, but software polling STATUS must still observe the error, so they
@@ -125,7 +130,7 @@ module uart_axi_top #(
             if (framing_err)                         sticky_framing_err <= 1'b1;
             else if (intr_clr[INTR_FRAMING_ERR_BIT]) sticky_framing_err <= 1'b0;
 
-            if (overrun_err)                         sticky_overrun_err <= 1'b1;
+            if (hw_overrun_err_event)                sticky_overrun_err <= 1'b1;
             else if (intr_clr[INTR_OVERRUN_ERR_BIT]) sticky_overrun_err <= 1'b0;
         end
     end

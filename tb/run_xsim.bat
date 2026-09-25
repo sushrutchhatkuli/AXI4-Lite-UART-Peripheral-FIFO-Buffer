@@ -7,8 +7,15 @@ REM Usage (from the repository root, with Vivado's bin directory on PATH):
 REM     tb\run_xsim.bat
 REM ============================================================================
 
-setlocal
+setlocal EnableDelayedExpansion
 cd /d "%~dp0.."
+
+where xvlog >nul 2>nul
+if errorlevel 1 (
+    if exist "C:\Xilinx\2025.1\Vivado\bin" (
+        set "PATH=C:\Xilinx\2025.1\Vivado\bin;!PATH!"
+    )
+)
 
 echo --- Compiling RTL and Testbench Sources ---
 call xvlog --sv ^

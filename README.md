@@ -17,8 +17,9 @@ Repository: [https://github.com/sushrutchhatkuli/AXI4-Lite-UART-Peripheral-FIFO-
 8. [Clock Domain Crossing & Metastability](#clock-domain-crossing--metastability)
 9. [Interrupt Architecture & Error Recovery](#interrupt-architecture--error-recovery)
 10. [Verification & Simulation Suite](#verification--simulation-suite)
-11. [Repository Organization](#repository-organization)
-12. [Simulation & Build Instructions](#simulation--build-instructions)
+11. [FPGA Synthesis & Timing Results](#fpga-synthesis--timing-results)
+12. [Repository Organization](#repository-organization)
+13. [Simulation & Build Instructions](#simulation--build-instructions)
 
 ---
 
@@ -332,6 +333,42 @@ graph TD
 
 ---
 
+## FPGA Synthesis & Timing Results
+
+The peripheral was synthesized targeting an **AMD/Xilinx Artix-7** FPGA (`xc7a35tcsg324-1`) using **AMD Vivado 2025.1** in non-project batch mode with an out-of-context synthesis flow.
+
+### Timing Performance Summary
+
+| Metric | Target Constraint | Measured Result | Status |
+| :--- | :---: | :---: | :---: |
+| **Clock Frequency ($f_{\text{clk}}$)** | 100.000 MHz ($T_{\text{clk}} = 10.000\text{ ns}$) | **224.31 MHz** ($T_{\text{min}} = 4.458\text{ ns}$) | MET |
+| **Worst Negative Slack (WNS)** | $> 0.000\text{ ns}$ | **+5.542 ns** | MET (0 failing endpoints / 901) |
+| **Worst Hold Slack (WHS)** | $> 0.000\text{ ns}$ | **+0.164 ns** | MET (0 failing endpoints / 901) |
+| **Worst Pulse Width Slack (WPWS)** | $> 0.000\text{ ns}$ | **+4.500 ns** | MET (0 failing endpoints / 501) |
+| **Total Negative Slack (TNS)** | $0.000\text{ ns}$ | **0.000 ns** | MET |
+| **Total Hold Slack (THS)** | $0.000\text{ ns}$ | **0.000 ns** | MET |
+
+### Resource Utilization Breakdown (Artix-7 xc7a35t)
+
+| Resource | Used | Available | Utilization % | Design Notes |
+| :--- | :---: | :---: | :---: | :--- |
+| **Slice LUTs** | 314 | 20,800 | 1.51% | All logic, decode, and arithmetic |
+| **LUT as Logic** | 314 | 20,800 | 1.51% | Decoupled AXI slave, baud generator, FSMs |
+| **LUT as Memory (Distributed)**| 0 | 9,600 | 0.00% | Circular FIFOs synthesized as flip-flop registers |
+| **Slice Registers (Flip-Flops)** | 501 | 41,600 | 1.20% | Dual 16x8 FIFO arrays, pipeline stages, CDC |
+| **Registers as Latches** | **0** | 41,600 | **0.00%** | Clean synchronous RTL: zero unintended latches |
+| **F7 / F8 Multiplexers** | 34 (28 / 6) | 24,450 | 0.14% | Wide 32-bit register readback multiplexing |
+| **Block RAM (RAMB18/RAMB36)** | 0 | 50 | 0.00% | Small buffer footprint does not consume BRAM tiles |
+| **DSP48 Slices** | 0 | 90 | 0.00% | Purely synchronous logic; no multiplier overhead |
+
+### Key Hardware Implementation Takeaways
+
+1. **High Timing Margin**: At 100 MHz, the design achieves $+5.542\text{ ns}$ of positive setup slack, enabling operation up to **224 MHz** without pipelining additions.
+2. **Zero Inferred Latches**: 100% of sequential elements are synchronous D-type flip-flops with explicit reset conditions, preventing timing hazards and race conditions.
+3. **Low Footprint**: The complete peripheral (dual 16-word FIFOs, baud generator, serializer, deserializer, and AXI4-Lite slave interface) consumes only 314 LUTs and 501 FFs, making it suitable for compact SoC integration.
+
+---
+
 ## Repository Organization
 
 ```
@@ -348,10 +385,15 @@ graph TD
 ├── tb/                                 Verification Suite
 │   ├── axi4_lite_if.sv                 SystemVerilog interface definition
 │   ├── axi_master_bfm.sv               Bus Functional Model with randomized latencies
-│   ├── tb_uart_axi_top.sv              Self-checking testbench
+│   ├── tb_uart_axi_top.sv              Self-checking testbench (20 self-checking assertions)
 │   ├── run_sim.do                      ModelSim batch compilation and execution script
 │   ├── run_xsim.bat                    Vivado xsim compile / elaborate / run script
 │   └── wave.do                         ModelSim waveform setup script
+├── synth/                              FPGA Synthesis Scripts & Reports (Artix-7)
+│   ├── synth.tcl                       Vivado non-project batch synthesis script
+│   ├── run_synth.bat                   Out-of-context synthesis batch runner
+│   ├── utilization.rpt                 Resource utilization report (314 LUTs, 501 FFs)
+│   └── timing.rpt                      Static timing report (WNS +5.542 ns, Fmax 224 MHz)
 └── docs/                               Obsidian Knowledge Base (Detailed Specs)
     ├── 00 - Index & Overview/          MOC and resume specification traceability
     ├── 01 - AMBA AXI4-Lite Protocol/   Protocol rules and register bitfields
@@ -379,6 +421,13 @@ tb\run_xsim.bat
 ```
 The script compiles the RTL and testbench with `xvlog`, elaborates with `xelab`, and runs
 the suite to completion with `xsim -R`.
+
+### Running Out-of-Context Synthesis (AMD Vivado)
+To run out-of-context synthesis and static timing analysis targeting the Artix-7 FPGA:
+```bat
+synth\run_synth.bat
+```
+The flow outputs detailed resource utilization and timing slack reports into `synth/utilization.rpt` and `synth/timing.rpt`.
 
 ### Running Simulation (ModelSim GUI)
 1. Launch ModelSim.

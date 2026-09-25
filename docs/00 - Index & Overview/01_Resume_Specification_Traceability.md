@@ -45,6 +45,7 @@ This document maps each bullet point from your resume directly to hardware desig
 - [[01_AXI4_Lite_Protocol_Fundamentals]]
 - [[02_AXI4_Lite_Slave_Interface_Architecture]]
 - [[03_Register_Map_Specification]]
+- [[02_FPGA_Synthesis_&_Implementation_Results]]
 
 ---
 

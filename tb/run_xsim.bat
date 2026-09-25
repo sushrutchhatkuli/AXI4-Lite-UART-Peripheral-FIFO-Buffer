@@ -8,7 +8,8 @@ REM     tb\run_xsim.bat
 REM ============================================================================
 
 setlocal EnableDelayedExpansion
-cd /d "%~dp0.."
+for %%I in ("%~dp0..") do set "ROOT_SHORT=%%~sI"
+cd /d "!ROOT_SHORT!"
 
 where xvlog >nul 2>nul
 if errorlevel 1 (

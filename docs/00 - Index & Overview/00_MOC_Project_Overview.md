@@ -22,7 +22,8 @@ Welcome to the central knowledge repository for the **AXI4-Lite UART Peripheral 
 ```
 00 - Index & Overview/
 ├── [[00_MOC_Project_Overview|Master Project MOC]]
-└── [[01_Resume_Specification_Traceability|Resume Specification & Traceability Matrix]]
+├── [[01_Resume_Specification_Traceability|Resume Specification & Traceability Matrix]]
+└── [[02_FPGA_Synthesis_&_Implementation_Results|FPGA Synthesis & Timing Implementation Results]]
 
 01 - AMBA AXI4-Lite Protocol/
 ├── [[01_AXI4_Lite_Protocol_Fundamentals|AXI4-Lite Protocol Fundamentals & Handshake Rules]]

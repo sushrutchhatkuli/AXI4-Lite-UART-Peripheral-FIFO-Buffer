@@ -385,9 +385,15 @@ The peripheral was synthesized targeting an **AMD/Xilinx Artix-7** FPGA (`xc7a35
 ├── tb/                                 Verification Suite
 │   ├── axi4_lite_if.sv                 SystemVerilog interface definition
 │   ├── axi_master_bfm.sv               Bus Functional Model with randomized latencies
-│   ├── tb_uart_axi_top.sv              Self-checking testbench (20 self-checking assertions)
+│   ├── tb_uart_axi_top.sv              Top-level regression testbench (20 self-checking assertions)
+│   ├── tb_uart_tx.sv                   Dedicated UART TX unit testbench (35 assertions)
+│   ├── tb_uart_rx.sv                   Dedicated UART RX unit testbench (25 assertions)
+│   ├── tb_fifo_circular.sv             Dedicated circular FIFO unit testbench (69 assertions)
+│   ├── run_xsim.bat                    Vivado top-level regression runner
+│   ├── run_tx_sim.bat                  Vivado UART TX unit test runner
+│   ├── run_rx_sim.bat                  Vivado UART RX unit test runner
+│   ├── run_fifo_sim.bat                Vivado circular FIFO unit test runner
 │   ├── run_sim.do                      ModelSim batch compilation and execution script
-│   ├── run_xsim.bat                    Vivado xsim compile / elaborate / run script
 │   └── wave.do                         ModelSim waveform setup script
 ├── synth/                              FPGA Synthesis Scripts & Reports (Artix-7)
 │   ├── synth.tcl                       Vivado non-project batch synthesis script
@@ -414,13 +420,21 @@ The peripheral was synthesized targeting an **AMD/Xilinx Artix-7** FPGA (`xc7a35
 - A SystemVerilog simulator: AMD/Xilinx Vivado (`xsim`) or Mentor ModelSim / QuestaSim
 - Git
 
-### Running Simulation (Vivado xsim)
+### Running Top-Level Regression Simulation (Vivado xsim)
 With Vivado's `bin` directory on `PATH`, from the repository root:
 ```bat
 tb\run_xsim.bat
 ```
 The script compiles the RTL and testbench with `xvlog`, elaborates with `xelab`, and runs
-the suite to completion with `xsim -R`.
+the 20-assertion top-level verification suite to completion with `xsim -R`.
+
+### Running Block-Level Unit Testbenches (Vivado xsim)
+Each core sub-module includes an independent, self-checking unit testbench:
+```bat
+tb\run_tx_sim.bat     :: UART Transmitter unit testbench (35 assertions passed)
+tb\run_rx_sim.bat     :: UART Receiver unit testbench (25 assertions passed)
+tb\run_fifo_sim.bat   :: Circular FIFO unit testbench (69 assertions passed)
+```
 
 ### Running Out-of-Context Synthesis (AMD Vivado)
 To run out-of-context synthesis and static timing analysis targeting the Artix-7 FPGA:

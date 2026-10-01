@@ -24,7 +24,7 @@ This core is structured to address three primary design objectives:
 ## The Engineering Problem: Bridging Asynchronous Speed Gaps
 
 ### The Speed Mismatch Problem
-Modern microprocessors process data in 32-bit words at **100+ MHz** (one clock cycle every 10 ns). In contrast, standard serial devices (debug consoles, GPS receivers, sensors) communicate over a single wire at **115,200 baud** (one bit every 8,680 ns—nearly **900 times slower**).
+Modern microprocessors process data in 32-bit words at **100+ MHz** (one clock cycle every 10 ns). In contrast, standard serial devices (debug consoles, GPS receivers, sensors) communicate over a single wire at **115,200 baud** (one bit every 8,680 ns, nearly **900 times slower**).
 
 If a high-speed CPU had to pause and wait for individual serial bits to send or arrive, it would waste millions of clock cycles sitting idle.
 
@@ -430,7 +430,7 @@ Further reference documentation:
 ### Concept 6: Clock Domain Crossing (CDC) & Metastability Protection
 
 #### Conceptual Overview: Asynchronous Signals & Metastability
-External serial signals are asynchronous to the internal FPGA system clock. If an incoming transition violates setup or hold timing constraints of an input flip-flop, the internal storage node can enter a metastable state—hovering between valid logic levels before resolving. If read prematurely, this ambiguous voltage can propagate conflicting logic levels through the design.
+External serial signals are asynchronous to the internal FPGA system clock. If an incoming transition violates setup or hold timing constraints of an input flip-flop, the internal storage node can enter a metastable state, hovering between valid logic levels before resolving. If read prematurely, this ambiguous voltage can propagate conflicting logic levels through the design.
 
 ```
        External RX ---> [ FF Stage 1 ] ---> [ FF Stage 2 ] ---> Synchronized RX
@@ -566,16 +566,16 @@ graph TD
 
 The verification suite features **149 total self-checking assertions**:
 
-1. **Top-Level Integration (`tb_uart_axi_top.sv` - 20 Assertions)**:
+1. **Top-Level Integration (`tb_uart_axi_top.sv`, 20 Assertions)**:
    - **Randomized Channel Skew**: Evaluates independent `AW` and `W` transaction phases by injecting pseudo-random delays (0 to 10 cycles), verifying the slave never deadlocks when data arrives prior to address or vice versa.
    - **Backpressure Testing**: Randomly asserts wait states on `BREADY` and `RREADY`, confirming the slave holds valid outputs stable until acknowledged.
    - **Internal Digital Loopback**: Verifies 1000+ pseudo-random byte transfers in internal loopback mode (`CTRL[2] = 1`) with an automated self-checking queue scoreboard.
    - **Framing Error Injection**: Intentionally forces serial line low during the stop bit window, confirming `FRAMING_ERR` asserts, the byte is rejected, and subsequent valid frames recover cleanly after W1C clearance.
-2. **UART TX Unit Testbench (`tb_uart_tx.sv` - 35 Assertions)**:
+2. **UART TX Unit Testbench (`tb_uart_tx.sv`, 35 Assertions)**:
    - Validates start bit, 8 data bits (LSB-first), stop bit duration, zero-bubble streaming, and idle recovery.
-3. **UART RX Unit Testbench (`tb_uart_rx.sv` - 25 Assertions)**:
+3. **UART RX Unit Testbench (`tb_uart_rx.sv`, 25 Assertions)**:
    - Validates Tick 7 center-sampling, start-bit noise pulse rejection, stop-bit framing violation, and `ERR_WAIT` resynchronization.
-4. **Circular FIFO Unit Testbench (`tb_fifo_circular.sv` - 69 Assertions)**:
+4. **Circular FIFO Unit Testbench (`tb_fifo_circular.sv`, 69 Assertions)**:
    - Validates single push/pop, continuous fill to capacity, full flag assertion, overrun rejection, empty flag assertion, and 64 continuous rollover cycles.
 
 Further reference documentation:
